@@ -1,0 +1,215 @@
+>>>malloy
+source: survey is duckdb.table("./survey.csv") extend {
+dimension: Survey is `Survey ResponseID`
+measure:
+`Total Surveyors` is count()
+`Age Group` is count(`Q-demos-age`)
+primary_key: Survey
+}
+source: amazon is duckdb.table("./amazon-purchases.csv") extend {
+join_one: survey with `Survey ResponseID`
+dimension:
+_day_of_year is day(`Order Date`)
+_month_of_year is month(`Order Date`)
+`Order Year` is year(`Order Date`)
+measure:
+`Total Surveyors` is count()
+`Total Revenue` is sum(`Purchase Price Per Unit`)
+`Average Price of Unit` is Avg(`Purchase Price Per Unit`)
+}
+>>>markdown
+DISCLAIMER: `Total Revenue` is the summed revenue from the products purchased by the reviewers.
+>>>malloy
+run: amazon -> {
+group_by:
+Category
+aggregate:
+# currency
+`Total Revenue`
+# currency
+`Average Price of Unit` is Avg(`Purchase Price Per Unit`)
+`Total Surveyors`
+where: Category is not null
+}
+>>>malloy
+run: survey -> {
+aggregate:`Total Surveyors` is count()
+nest: Age is {
+    aggregate: `Total Surveyors`
+    group_by: `Age Demographic` is `Q-demos-age`
+    order_by: `Age Demographic` asc
+        }
+nest: Education is {
+    aggregate: `Total Surveyors`
+    group_by: `Education Demographic` is `Q-demos-education`
+    order_by: `Total Surveyors` desc
+        }
+nest: Income is {
+    aggregate: `Total Surveyors`
+    group_by: `Income Demographic` is `Q-demos-income`
+    order_by: `Total Surveyors` desc
+        }
+nest: Gender is {
+    aggregate: `Total Surveyors`
+    group_by: `Gender Demographic` is `Q-demos-gender`
+        }
+nest: Race is {
+    aggregate: `Total Surveyors`
+    group_by: `Race Demographic` is `Q-demos-race`
+        }
+nest: `Sexual Orientation` is {
+    aggregate: `Total Surveyors`
+    group_by: `Sexual Orientation Demographic` is `Q-sexual-orientation`
+        }
+nest: `Small Business` is {
+    aggregate: `Total Surveyors`
+    group_by: `Small Business Use Demographic` is `Q-small-biz-use`
+        }}
+>>>malloy
+run: amazon -> {
+group_by:
+Category
+aggregate: `Total Surveyors`
+where: Category is not null
+nest: `Gender of Reviewer` is {
+group_by: survey.`Q-demos-gender`
+nest: `Race of Reviewer` is {
+group_by:
+survey.`Q-demos-race`
+aggregate: Surveyors is `Total Surveyors`
+limit: 10
+}}}
+>>>markdown
+Note: excluded 31st days of months to remove skew.
+>>>malloy
+# line_chart
+run: amazon -> {
+group_by:
+`Day of Year` is _day_of_year
+where: day(`Order Date`) != 31
+aggregate:
+`Orders Made by Surveyors` is `Total Surveyors`
+order_by: `Day of Year` asc
+}
+>>>malloy
+# line_chart
+run: amazon -> {
+group_by:
+`Month of Year` is _month_of_year
+aggregate:
+`Orders Made by Surveyors` is `Total Surveyors`
+order_by: `Month of Year` asc
+}
+>>>markdown
+Note: 2024 is excluded do to lack of comparable numbers.
+>>>malloy
+# line_chart
+run: amazon -> {
+group_by:
+`Order Year`
+where: `Order Year` < 2024
+aggregate:
+`Orders Made by Surveyors` is `Total Surveyors`
+order_by: `Order Year` asc
+}
+>>>malloy
+# shape_map
+run: amazon -> {
+group_by:
+`Shipping Address State`
+aggregate:
+`Total Surveyors`
+}
+>>>malloy
+run: amazon -> {
+group_by:
+`Shipping Address State`
+aggregate:
+`Total Surveyors`
+nest: `Top Selling Categories` is {
+group_by:
+Category
+limit: 10
+aggregate:
+`Total Surveyors`
+where: Category is not null
+}}
+>>>malloy
+run: amazon -> {
+group_by: `Shipping Address State`
+aggregate: `Total Surveyors`
+nest: `Income Breakdown` is {
+group_by:
+`Income Demographic` is survey.`Q-demos-income`
+aggregate:
+# currency
+`Average Price of Unit`
+# currency
+`Max Price` is max(`Purchase Price Per Unit`)
+# currency
+`Min Price` is min(`Purchase Price Per Unit`)
+# percent
+`% of Surveyors` is `Total Surveyors`/all(`Total Surveyors`)
+}}
+>>>malloy
+run: amazon -> {
+nest: `Income Demographics` is {
+group_by: `Age Demographic` is survey.`Q-demos-income`
+aggregate:
+# percent
+`% of Surveyors` is `Total Surveyors`/all(`Total Surveyors`)
+nest: `Age Group Breakdown` is {
+    group_by: Category
+    limit: 10
+    aggregate:
+    # currency
+    `Average Price of Unit`
+    `Quantity Purchased` is `Total Surveyors`
+    order_by: `Quantity Purchased` desc
+    where: Category is not null
+}}
+nest: `Age Demographics` is {
+group_by: `Age Demographic` is survey.`Q-demos-age`
+aggregate:
+# percent
+`% of Surveyors` is `Total Surveyors`/all(`Total Surveyors`)
+nest: `Age Group Breakdown` is {
+    group_by: Category
+    limit: 10
+    aggregate:
+    # currency
+    `Average Price of Unit`
+    `Quantity Purchased` is `Total Surveyors`
+    order_by: `Quantity Purchased` desc
+    where: Category is not null
+}}
+nest: `Race Demographics` is {
+group_by: `Race Demographic` is survey.`Q-demos-race`
+aggregate:
+# percent
+`% of Surveyors` is `Total Surveyors`/all(`Total Surveyors`)
+nest: `Age Group Breakdown` is {
+    group_by: Category
+    limit: 10
+    aggregate:
+    # currency
+    `Average Price of Unit`
+    `Quantity Purchased` is `Total Surveyors`
+    order_by: `Quantity Purchased` desc
+    where: Category is not null
+}}
+nest: `Gender Demographics` is {
+group_by: `Gender Demographic` is survey.`Q-demos-gender`
+aggregate:
+# percent
+`% of Surveyors` is `Total Surveyors`/all(`Total Surveyors`)
+nest: `Age Group Breakdown` is {
+    group_by: Category
+    limit: 10
+    aggregate:
+    # currency
+    `Average Price of Unit`
+    `Quantity Purchased` is `Total Surveyors`
+    order_by: `Quantity Purchased` desc
+    where: Category is not null
+}}}
